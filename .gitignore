@@ -7,6 +7,8 @@ dist/
 .env.local
 .env*.local
 .data/
+.vscode/
+.workbuddy
 *.log
 .DS_Store
 next-env.d.ts

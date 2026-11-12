@@ -829,6 +829,46 @@ a {
   line-height: 16px;
 }
 
+/* 定位到当前对话：仅当当前对话滚出可视区时出现 */
+.locate-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border: 1px solid rgba(99, 102, 241, 0.42);
+  border-radius: 20px;
+  background: rgba(99, 102, 241, 0.16);
+  color: #b9bbf7;
+  font-family: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0;
+  line-height: 16px;
+  cursor: pointer;
+  transition: background 0.14s, color 0.14s;
+}
+
+.locate-btn:hover {
+  background: rgba(99, 102, 241, 0.3);
+  color: #e3e4ff;
+}
+
+/* 定位命中后的短暂高亮 */
+.conv.flash {
+  animation: conv-flash 1.3s ease both;
+}
+
+@keyframes conv-flash {
+  0% {
+    background: rgba(129, 140, 248, 0.5);
+    box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.5);
+  }
+  100% {
+    background: rgba(99, 102, 241, 0.18);
+    box-shadow: 0 0 0 0 rgba(129, 140, 248, 0);
+  }
+}
+
 .recent-list {
   flex: 1;
   min-height: 0;
@@ -919,13 +959,13 @@ a {
   transition: opacity 0.14s;
 }
 
-.conv-del {
+.conv-more {
   position: absolute;
   right: 5px;
   top: 50%;
   transform: translateY(-50%);
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: grid;
   place-items: center;
   border: none;
@@ -938,14 +978,280 @@ a {
   transition: opacity 0.14s, color 0.14s, background 0.14s;
 }
 
-.conv:hover .conv-del {
+.conv:hover .conv-more,
+.conv.menu-open .conv-more,
+.conv-more:focus-visible {
   opacity: 1;
   pointer-events: auto;
 }
 
-.conv-del:hover {
-  background: #3a1d24;
-  color: #f87171;
+.conv-more:hover,
+.conv-more.open {
+  background: #272d40;
+  color: #c9cbff;
+}
+
+/* 行内重命名 */
+.conv-editing {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 6px 3px 8px;
+}
+
+.conv-editing > svg {
+  flex: 0 0 auto;
+  opacity: 0.65;
+  color: #a8b1c4;
+}
+
+.conv-rename {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 7px;
+  border: 1px solid #6366f1;
+  border-radius: 6px;
+  background: #0e1320;
+  color: #e8eaf3;
+  font-family: inherit;
+  font-size: 12.5px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.conv-rename::placeholder {
+  color: #5f677b;
+}
+
+/* 「更多」上拉菜单 */
+.conv-menu-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+}
+
+.conv-menu {
+  position: fixed;
+  z-index: 301;
+  width: 150px;
+  padding: 4px;
+  background: #1a1f2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  box-shadow: 0 20px 44px -14px rgba(0, 0, 0, 0.65);
+  animation: menu-pop 0.12s ease both;
+}
+
+.conv-menu button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: #c3cadb;
+  font-family: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.conv-menu button:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.conv-menu button.danger {
+  color: #e8837a;
+}
+
+.conv-menu button.danger:hover {
+  background: rgba(220, 38, 38, 0.16);
+  color: #fca5a5;
+}
+
+.conv-menu-sep {
+  height: 1px;
+  margin: 3px 6px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* 置顶会话：标题前的图钉高亮 */
+.conv.pinned .conv-open svg {
+  opacity: 1;
+  color: #e0b356;
+}
+
+/* 置顶行内的分组徽标 */
+.conv-group-tag {
+  flex: 0 0 auto;
+  max-width: 64px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.22);
+  color: #b9bbf7;
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+/* 列表分区标题（置顶 / 分组名 / 对话） */
+.conv-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-bottom: 6px;
+}
+
+.conv-section:last-child {
+  margin-bottom: 0;
+}
+
+.conv-section-head {
+  padding: 6px 8px 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: #6b7386;
+  user-select: none;
+}
+
+/* 分组选择面板 */
+.conv-menu-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #dfe3ee;
+}
+
+/* 优先级需盖过 .conv-menu button 的 width:100% */
+.conv-menu .conv-menu-back {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #8b93a7;
+  cursor: pointer;
+}
+
+.conv-menu .conv-menu-back:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.conv-menu-groups {
+  max-height: 168px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.conv-menu-groups::-webkit-scrollbar {
+  width: 4px;
+}
+
+.conv-menu-groups::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+}
+
+.conv-menu-hint {
+  padding: 4px 9px 6px;
+  font-size: 11px;
+  color: #5f677b;
+}
+
+.conv-menu-group-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conv-menu button.current {
+  color: #c9cbff;
+}
+
+.conv-menu button.current:hover {
+  color: #dfe0ff;
+}
+
+/* 新建分组输入行 */
+.conv-new-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px;
+}
+
+.conv-new-group input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  background: #0e1320;
+  color: #e8eaf3;
+  font-family: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.conv-new-group input:focus {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.16);
+}
+
+.conv-new-group input::placeholder {
+  color: #5f677b;
+}
+
+.conv-new-group button {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border: none;
+  border-radius: 6px;
+  background: #6366f1;
+  color: #fff;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.conv-new-group button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.conv-new-group button:not(:disabled):hover {
+  background: #7679f5;
+}
+
+@keyframes menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* ---------- 聊天区 ---------- */

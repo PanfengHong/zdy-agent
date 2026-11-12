@@ -1,0 +1,58 @@
+services:
+  db:
+    # Docker Hub 直连失败时可在 .env 里覆盖：
+    # POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: zdy-agent-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-zdy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-zdy-agent-secret}
+      POSTGRES_DB: ${POSTGRES_DB:-zdy_agent}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zdy} -d ${POSTGRES_DB:-zdy_agent}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    ports:
+      # 仅本机调试用；生产建议删掉，只走 compose 内网
+      - "5433:5432"
+
+  app:
+    build:
+      context: .
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+    container_name: zdy-agent-app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      # 应用数据持久层：设置后向量索引与文档注册表存入 PostgreSQL
+      DATABASE_URL: postgres://${POSTGRES_USER:-zdy}:${POSTGRES_PASSWORD:-zdy-agent-secret}@db:5432/${POSTGRES_DB:-zdy_agent}
+      # 模型密钥从 .env.local 读取（不存在则用环境变量，见 README 部署章节）
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.deepseek.com/v1}
+      CHAT_MODEL: ${CHAT_MODEL:-deepseek-chat}
+      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-${OPENAI_API_KEY}}
+      EMBEDDING_BASE_URL: ${EMBEDDING_BASE_URL:-${OPENAI_BASE_URL:-https://api.deepseek.com/v1}}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-}
+      CHAT_TEMPERATURE: ${CHAT_TEMPERATURE:-0.2}
+      CHAT_MAX_TOKENS: ${CHAT_MAX_TOKENS:-2048}
+      CHUNK_SIZE: ${CHUNK_SIZE:-800}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-120}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
+      RETRIEVAL_MIN_SCORE: ${RETRIEVAL_MIN_SCORE:-0.25}
+    ports:
+      # 宿主机端口冲突时可覆盖：.env 里 APP_PORT=3100
+      - "${APP_PORT:-3000}:3000"
+    # 原始文件与向量索引在 DB 模式下都在 PostgreSQL；此卷仅保留给非 DB 数据兜底
+    volumes:
+      - appdata:/app/.data
+
+volumes:
+  pgdata:
+  appdata:

@@ -16,6 +16,12 @@ export interface ConversationMeta {
   createdAt: number;
   updatedAt: number;
   count: number;
+  /** 用户手动重命名过：后续 saveMessages 不再用首条提问覆盖标题 */
+  customTitle?: boolean;
+  /** 置顶会话：列表最前展示，且不会被上限清理淘汰 */
+  pinned?: boolean;
+  /** 所属分组名；为空表示未分组 */
+  group?: string;
 }
 
 const INDEX_KEY = "zdy:conversations:v1";
@@ -53,7 +59,28 @@ function writeIndex(list: ConversationMeta[]) {
 export function listConversations(): ConversationMeta[] {
   if (!isBrowser()) return [];
   const list = safeParse<ConversationMeta[]>(localStorage.getItem(INDEX_KEY), []);
-  return Array.isArray(list) ? [...list].sort((a, b) => b.updatedAt - a.updatedAt) : [];
+  if (!Array.isArray(list)) return [];
+  // 置顶优先，其余按最近更新排序
+  return [...list].sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt);
+}
+
+/** 置顶 / 取消置顶 */
+export function setPinned(id: string, pinned: boolean) {
+  const list = listConversations().map((c) => (c.id === id ? { ...c, pinned: pinned || undefined } : c));
+  writeIndex(list);
+  emit();
+}
+
+/**
+ * 设置 / 更换分组。传空串或 null 表示移出分组。
+ * 分组名会去除首尾空白并截断到 20 字；全空白视为移出。
+ */
+export function setConversationGroup(id: string, group: string | null): string | null {
+  const next = group?.replace(/\s+/g, " ").trim().slice(0, 20) || null;
+  const list = listConversations().map((c) => (c.id === id ? { ...c, group: next ?? undefined } : c));
+  writeIndex(list);
+  emit();
+  return next;
 }
 
 export function getActiveId(): string | null {
@@ -94,8 +121,8 @@ export function createConversation(title = "新对话"): ConversationMeta {
     count: 0,
   };
   const list = [meta, ...listConversations()];
-  // 超出上限时把最老会话的正文一起清掉，避免占满配额
-  const overflow = list.slice(MAX_CONVERSATIONS);
+  // 超出上限时把最老会话的正文一起清掉，避免占满配额（置顶会话不淘汰）
+  const overflow = list.filter((c) => !c.pinned).slice(MAX_CONVERSATIONS);
   if (overflow.length) {
     for (const old of overflow) localStorage.removeItem(MSG_PREFIX + old.id);
   }
@@ -104,10 +131,17 @@ export function createConversation(title = "新对话"): ConversationMeta {
   return meta;
 }
 
-export function renameConversation(id: string, title: string) {
-  const list = listConversations().map((c) => (c.id === id ? { ...c, title } : c));
+/**
+ * 重命名会话。空标题视为取消，直接返回 false。
+ * 打上 customTitle 标记，避免下一轮对话把用户改的名字冲掉。
+ */
+export function renameConversation(id: string, title: string): boolean {
+  const next = title.replace(/\s+/g, " ").trim().slice(0, 60);
+  if (!next) return false;
+  const list = listConversations().map((c) => (c.id === id ? { ...c, title: next, customTitle: true } : c));
   writeIndex(list);
   emit();
+  return true;
 }
 
 export function deleteConversation(id: string) {
@@ -140,13 +174,18 @@ export function saveMessages(id: string, messages: ChatMessage[]) {
   const list = listConversations();
   const idx = list.findIndex((c) => c.id === id);
   const firstUser = messages.find((m) => m.role === "user");
-  const title = firstUser ? titleFromText(firstUser.content) : "新对话";
+  const prev = idx >= 0 ? list[idx] : null;
+  // 用户手动改过名字就保留，否则跟随首条提问自动生成
+  const title = prev?.customTitle ? prev.title : firstUser ? titleFromText(firstUser.content) : "新对话";
   const meta: ConversationMeta = {
     id,
     title,
-    createdAt: idx >= 0 ? list[idx].createdAt : Date.now(),
+    createdAt: prev ? prev.createdAt : Date.now(),
     updatedAt: Date.now(),
     count: messages.length,
+    customTitle: prev?.customTitle,
+    pinned: prev?.pinned,
+    group: prev?.group,
   };
 
   if (idx >= 0) list[idx] = meta;

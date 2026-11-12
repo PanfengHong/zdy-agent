@@ -38,6 +38,8 @@ export function ChatWorkspace() {
   const [llmReady, setLlmReady] = useState(true);
   const [hints, setHints] = useState<string[]>([]);
   const [activeId, setActiveIdState] = useState<string | null>(null);
+  /** 会话索引版本号：重命名等元数据变化时 +1，用来刷新页头标题 */
+  const [metaTick, setMetaTick] = useState(0);
   /** 用户在输入框里显式指定的插件 */
   const [pendingPlugin, setPendingPlugin] = useState<PluginMeta | null>(null);
 
@@ -63,8 +65,8 @@ export function ChatWorkspace() {
 
   const activeTitle = useMemo(
     () => (activeId ? listConversations().find((c) => c.id === activeId)?.title ?? "新对话" : "新对话"),
-    // messages 变化时标题可能才写入索引（首条提问），这里一并刷新
-    [activeId, messages]
+    // messages 变化时标题可能才写入索引（首条提问）；metaTick 用于重命名后同步页头
+    [activeId, messages, metaTick]
   );
 
   /** 立即把待落盘的消息写入（切换会话 / 卸载时用，避免丢掉最后几百毫秒的内容） */
@@ -105,6 +107,7 @@ export function ChatWorkspace() {
       .catch(() => setLlmReady(false));
 
     const sync = () => {
+      setMetaTick((t) => t + 1);
       const id = getActiveId();
       if (id === activeIdRef.current) return;
       abortRef.current?.abort();

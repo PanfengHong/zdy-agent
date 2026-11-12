@@ -8,7 +8,7 @@
 | 能力 | 说明 |
 | --- | --- |
 | 流式对话 | SSE 逐字输出，支持中途停止、回答完成状态条 |
-| 多轮会话 | 侧边栏「新建对话」+ 最近对话列表，历史自动保存在浏览器本地（旧版单会话数据自动迁移） |
+| 多轮会话 | 侧边栏「新建对话」+ 最近对话列表，历史自动保存在浏览器本地（旧版单会话数据自动迁移）；每条会话「⋯」菜单支持置顶（列表最前、上限清理时不淘汰）、分组（新建/选择/移出，列表按「置顶 → 分组 → 对话」分区展示）、重命名（行内编辑，自定义标题不会被自动标题覆盖）与删除；当前对话滚出列表可视区时标题行出现「定位」按钮，点击平滑滚动到该对话并短暂高亮 |
 | 全局搜索 | 侧边栏搜索按钮或 `Ctrl/⌘ + K` 唤起居中弹窗，同时搜历史对话（标题+正文全文，带片段预览与关键词高亮）和知识库文档名 |
 | 个人中心 | 侧边栏底部头像 + 昵称/邮箱，下拉菜单：个人设置（改昵称/邮箱）、知识库管理、退出登录（带确认） |
 | Agent 工具调用 | `search_knowledge_base` / `list_knowledge_base`，最多 5 轮推理循环 |
@@ -106,6 +106,7 @@ npm run dev
 | `CHUNK_SIZE` / `CHUNK_OVERLAP` | 切分窗口 / 重叠字符数 | `800` / `120` |
 | `RETRIEVAL_TOP_K` / `RETRIEVAL_MIN_SCORE` | 召回条数 / 余弦阈值 | `5` / `0.25` |
 | `DATA_DIR` | 数据目录 | `./.data` |
+| `DATABASE_URL` | PostgreSQL 连接串；设置后向量索引与文档注册表入库（Docker Compose 默认已配），不设置走本地 JSON 文件 | 空（文件模式） |
 
 常用组合：
 
@@ -198,12 +199,53 @@ export default {
 
 ## 生产部署
 
+### Docker Compose 一键部署（推荐）
+
+多阶段构建（deps → builder → runner，standalone 产物）+ PostgreSQL 持久化。配置了 `DATABASE_URL` 后，向量索引与文档注册表自动存入 PostgreSQL；不设置则回落到本地 JSON 文件模式。
+
 ```bash
-npm run build && npm start        # 或部署到 Vercel / Docker
+# 1. 准备环境变量（compose 从项目根目录 .env 读取变量替换）
+cp .env.example .env
+#    编辑 .env：至少填 OPENAI_API_KEY（以及需要时的 EMBEDDING_*）
+
+# 2. 构建并启动（app + postgres 两个服务）
+docker compose up -d --build
+
+# 3. 验证
+curl http://localhost:3000/api/health
+#    database.mode = "postgres"、connected = true 即数据库已接通
 ```
 
-- `.data` 目录必须挂载持久卷，否则重启丢索引。
-- 多实例部署时把 `FileVectorStore` 换成 pgvector（同一台 PG 还能存 `documents.json` 的元数据）。
+访问 `http://localhost:3000` 即可使用。`docker compose down` 停止（数据在 `pgdata` 卷中，不会丢）；`docker compose down -v` 连数据库数据一起清空。
+
+**要点**：
+- 应用镜像内 `DATA_DIR=/app/.data`，已挂 `appdata` 卷；数据库数据在 `pgdata` 卷。
+- `db` 服务映射了 `5433:5432` 仅方便本机调试，生产环境建议删掉该映射只走 compose 内网。
+- Docker Hub 直连失败（`dial tcp registry-1.docker.io:443` 超时）时，用国内镜像源构建，无需改守护进程配置：
+  ```bash
+  # .env 里追加：
+  # NODE_IMAGE=docker.m.daocloud.io/library/node:22-alpine
+  # POSTGRES_IMAGE=docker.m.daocloud.io/library/postgres:16-alpine
+  docker compose up -d --build
+  ```
+- 模型密钥不要写进镜像：`.dockerignore` 已排除 `.env.local`，运行时变量全部来自 compose 的 `environment` / `.env`。
+
+### Dockerfile 结构
+
+| 阶段 | 基础镜像 | 做什么 |
+| --- | --- | --- |
+| deps | node:22-alpine | `npm ci`，依赖层缓存 |
+| builder | node:22-alpine | `next build`，产出 standalone 自包含产物 |
+| runner | node:22-alpine | 只拷 standalone + static + `plugins/`，非 root 运行，带 HEALTHCHECK |
+
+### 不用 Docker
+
+```bash
+npm run build && npm start        # 或部署到 Vercel
+```
+
+- 未配置数据库时 `.data` 目录必须挂持久卷，否则重启丢索引。
+- `scripts/ingest.ts` 与 API 共用同一存储层，配置了 `DATABASE_URL` 后 CLI 入库也直接写 PostgreSQL。
 
 ## 常见问题
 
@@ -239,7 +281,7 @@ unpdf 只能提取文本层。扫描件需要 OCR（可接 PaddleOCR / 云 OCR �
 
 ## 下一步可以做什么
 
-- 服务端会话记忆（PostgreSQL + `UpstashRedis` / 自建 session 表，实现跨设备同步）
+- 服务端会话记忆（`DATABASE_URL` 已接入 PostgreSQL，把 localStorage 会话迁到 `sessions` 表即可实现跨设备同步）
 - 混合检索（向量 + BM25）与 Rerank 重排（bge-reranker）
-- 文档级权限过滤（`FileVectorStore` 已支持 metadata filter，传入 `{ userId }` 即可按人过滤）
+- 文档级权限过滤（向量库已支持 metadata filter，传入 `{ userId }` 即可按人过滤）
 - 流式结构化输出、MCP 工具接入（可做成一个「MCP 桥」插件，把远端 MCP 服务的工具映射成本地插件工具）、Eval 评测集

@@ -1,11 +1,13 @@
 import { ChatOpenAI, OpenAIEmbeddings } from "@langchain/openai";
 import type { EmbeddingsInterface } from "@langchain/core/embeddings";
 import { getEmbeddingConfig, getLlmConfig, getPaths, isEmbeddingConfigured, isLlmConfigured, diagnoseEnv } from "./config";
+import { isDatabaseConfigured } from "./db/pg";
 import { FileVectorStore } from "./vectorstore/FileVectorStore";
+import { PgVectorStore } from "./vectorstore/PgVectorStore";
 
 let chatModel: ChatOpenAI | null = null;
 let embeddings: OpenAIEmbeddings | null = null;
-let vectorStore: FileVectorStore | null = null;
+let vectorStore: FileVectorStore | PgVectorStore | null = null;
 
 export function assertLlmReady() {
   if (!isLlmConfigured()) {
@@ -45,9 +47,15 @@ export function getEmbeddings(): EmbeddingsInterface {
   return embeddings;
 }
 
-export function getVectorStore(): FileVectorStore {
+/**
+ * 向量库工厂：配置了 DATABASE_URL 走 PostgreSQL，否则用本地 JSON 文件。
+ * 调用方只依赖 VectorStore 抽象，两种后端接口完全一致。
+ */
+export function getVectorStore(): FileVectorStore | PgVectorStore {
   if (!vectorStore) {
-    vectorStore = new FileVectorStore(getEmbeddings(), { filePath: getPaths().vectorFile });
+    vectorStore = isDatabaseConfigured()
+      ? new PgVectorStore(getEmbeddings())
+      : new FileVectorStore(getEmbeddings(), { filePath: getPaths().vectorFile });
   }
   return vectorStore;
 }

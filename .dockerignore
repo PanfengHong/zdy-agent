@@ -1,0 +1,13 @@
+node_modules
+.next
+.data
+.git
+.gitignore
+*.md
+.env.local
+.env
+.env.*.local
+zdy-e2e
+shots
+*.log
+tsconfig.tsbuildinfo
