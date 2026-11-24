@@ -7,10 +7,13 @@
  * UI（components/UserMenu.tsx）不用改。
  */
 
+export type Theme = "light" | "dark";
+
 export interface Profile {
   name: string;
   email: string;
   signedIn: boolean;
+  theme: Theme;
 }
 
 const KEY = "zdy:profile:v1";
@@ -20,6 +23,7 @@ export const DEFAULT_PROFILE: Profile = {
   name: "ZDY 用户",
   email: "local@zdy.agent",
   signedIn: true,
+  theme: "light",
 };
 
 const isBrowser = () => typeof window !== "undefined";
@@ -39,6 +43,7 @@ export function getProfile(): Profile {
       name: typeof parsed.name === "string" && parsed.name.trim() ? parsed.name : DEFAULT_PROFILE.name,
       email: typeof parsed.email === "string" ? parsed.email : DEFAULT_PROFILE.email,
       signedIn: parsed.signedIn !== false,
+      theme: parsed.theme === "dark" ? "dark" : "light",
     };
   } catch {
     return DEFAULT_PROFILE;

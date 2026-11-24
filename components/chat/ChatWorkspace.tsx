@@ -12,7 +12,8 @@ import {
   subscribe,
   titleFromText,
 } from "@/lib/conversations";
-import { Composer } from "./Composer";
+import { Composer, type ComposerAttachment } from "./Composer";
+import { DocumentPreview, type PreviewTarget } from "./DocumentPreview";
 import { MessageItem } from "./MessageItem";
 import { enabledPluginIds, isPluginEnabled, takePluginDraft, usePlugins } from "@/lib/plugins/client";
 import type { PluginMeta } from "@/lib/plugins/types";
@@ -42,6 +43,7 @@ export function ChatWorkspace() {
   const [metaTick, setMetaTick] = useState(0);
   /** 用户在输入框里显式指定的插件 */
   const [pendingPlugin, setPendingPlugin] = useState<PluginMeta | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(null);
 
   const { plugins } = usePlugins();
   const pluginsRef = useRef<PluginMeta[]>([]);
@@ -271,8 +273,14 @@ export function ChatWorkspace() {
   );
 
   const send = useCallback(
-    async (raw?: string) => {
-      const content = (raw ?? input).trim();
+    async (raw?: string, attachments: ComposerAttachment[] = []) => {
+      const text = (raw ?? input).trim();
+      const notes = attachments.map((a) =>
+        a.kind === "image"
+          ? `[图片：${a.name}]`
+          : `[附件：${a.name}${a.status === "done" ? "（已入库）" : ""}]`
+      );
+      const content = [text, notes.join("\n")].filter(Boolean).join("\n\n").trim();
       if (!content || streamingId) return;
 
       // 草稿态：第一次提问时才真正落成一个会话，标题取提问内容
@@ -286,7 +294,18 @@ export function ChatWorkspace() {
         setActiveId(meta.id);
       }
 
-      const userMessage: ChatMessage = { id: uid(), role: "user", content, createdAt: Date.now() };
+      const userMessage: ChatMessage = {
+        id: uid(),
+        role: "user",
+        content,
+        attachments: attachments.map((a) => ({
+          id: a.id,
+          name: a.name,
+          kind: a.kind,
+          documentId: a.documentId,
+        })),
+        createdAt: Date.now(),
+      };
       const assistantId = uid();
       const history = [
         ...messages.map((m) => ({ role: m.role, content: m.content })),
@@ -396,6 +415,7 @@ export function ChatWorkspace() {
                 streaming={streamingId === m.id}
                 onRegenerate={m.role === "assistant" ? regenerate : undefined}
                 regenerateDisabled={streaming}
+                onOpenDocument={setPreviewTarget}
               />
             ))}
           </div>
@@ -428,7 +448,7 @@ export function ChatWorkspace() {
         <Composer
           value={input}
           onChange={setInput}
-          onSend={() => send()}
+          onSend={(attachments) => send(undefined, attachments)}
           onStop={stop}
           streaming={streaming}
           plugins={plugins}
@@ -437,9 +457,11 @@ export function ChatWorkspace() {
           onClearPending={() => setPendingPlugin(null)}
         />
         <div className="composer-hint">
-          输入 <code>/</code> 或点左侧插件按钮快速调用 · Enter 发送 · Shift + Enter 换行 · 答案由模型生成，关键信息请核对原文
+          输入 <code>/</code> 或点底部左侧插件按钮快速调用 · 可上传文件入库、添加图片 · Enter 发送 · Shift + Enter 换行
         </div>
       </div>
+
+      <DocumentPreview target={previewTarget} onClose={() => setPreviewTarget(null)} />
     </div>
   );
 }

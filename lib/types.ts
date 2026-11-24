@@ -3,6 +3,8 @@ export type Role = "user" | "assistant";
 /** 命中片段，用于前端引用展示 */
 export interface Source {
   id: string;
+  /** 所属文档 id，用于打开右侧文件预览 */
+  docId?: string;
   source: string;
   chunk: number;
   score: number;
@@ -19,10 +21,19 @@ export interface ToolTrace {
   summary?: string;
 }
 
+export interface MessageAttachment {
+  id: string;
+  name: string;
+  kind: "file" | "image";
+  /** 服务端保存的原文件 id，用于右侧预览 */
+  documentId?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: Role;
   content: string;
+  attachments?: MessageAttachment[];
   sources?: Source[];
   tools?: ToolTrace[];
   error?: string;

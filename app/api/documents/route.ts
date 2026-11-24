@@ -37,6 +37,7 @@ export async function POST(req: Request) {
   }
 
   const results: Array<{
+    id?: string;
     name: string;
     ok: boolean;
     chunks?: number;
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
     try {
       const buffer = Buffer.from(await file.arrayBuffer());
       const res = await ingestFile({ buffer, filename: file.name });
-      results.push({ name: res.name, ok: true, chunks: res.chunks, chars: res.chars, replaced: res.replaced });
+      results.push({ id: res.id, name: res.name, ok: true, chunks: res.chunks, chars: res.chars, replaced: res.replaced });
     } catch (err) {
       results.push({ name: file.name, ok: false, error: (err as Error).message });
     }

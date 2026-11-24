@@ -1,8 +1,14 @@
 "use client";
 
 import type { Source } from "@/lib/types";
+import type { PreviewTarget } from "./DocumentPreview";
 
-export function SourceList({ sources }: { sources: Source[] }) {
+interface Props {
+  sources: Source[];
+  onOpenDocument?: (target: PreviewTarget) => void;
+}
+
+export function SourceList({ sources, onOpenDocument }: Props) {
   if (sources.length === 0) return null;
   return (
     <div className="sources">
@@ -18,7 +24,14 @@ export function SourceList({ sources }: { sources: Source[] }) {
           <div className="source-idx">{i + 1}</div>
           <div className="source-main">
             <div className="source-name">
-              <span>{s.source}</span>
+              <button
+                type="button"
+                className="source-link"
+                onClick={() => onOpenDocument?.({ id: s.docId, name: s.source })}
+                title={s.docId ? `预览 ${s.source}` : `${s.source}（原文件未保存）`}
+              >
+                {s.source}
+              </button>
               <span className="score">相关度 {s.score.toFixed(2)}</span>
               <span style={{ color: "var(--text-faint)", fontWeight: 400, fontSize: 11.5 }}>第 {s.chunk + 1} 片段</span>
             </div>

@@ -7,6 +7,7 @@ import type { DocMeta } from "../types";
 import { cleanText, extractText, getExtension, isSupported } from "./loader";
 import { splitIntoChunks } from "./splitter";
 import { findByName, removeDocument, upsertDocument } from "../store/registry";
+import { deleteStoredFile, mimeOf, saveStoredFile } from "../store/files";
 
 const MAX_CHUNKS = 4000;
 
@@ -71,6 +72,7 @@ export async function ingestFile({ buffer, filename, title }: IngestInput): Prom
     updatedAt: now,
   };
   await upsertDocument(meta);
+  await saveStoredFile(docId, name, mimeOf(name), buffer);
 
   return { id: docId, name, chunks: chunks.length, chars: text.length, replaced: Boolean(existing) };
 }
@@ -87,6 +89,7 @@ export async function deleteDocumentById(id: string): Promise<boolean> {
   const store = getVectorStore();
   await store.deleteBySource(meta.name);
   await removeDocument(id);
+  await deleteStoredFile(id);
   return true;
 }
 

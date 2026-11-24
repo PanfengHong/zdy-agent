@@ -6,19 +6,45 @@ import type { ChatMessage } from "@/lib/types";
 import { MessageActions } from "./MessageActions";
 import { SourceList } from "./SourceList";
 import { ToolTraces } from "./ToolTraces";
+import type { PreviewTarget } from "./DocumentPreview";
 
 interface Props {
   message: ChatMessage;
   streaming?: boolean;
   onRegenerate?: (id: string) => void;
   regenerateDisabled?: boolean;
+  onOpenDocument?: (target: PreviewTarget) => void;
 }
 
-export function MessageItem({ message, streaming = false, onRegenerate, regenerateDisabled }: Props) {
+export function MessageItem({
+  message,
+  streaming = false,
+  onRegenerate,
+  regenerateDisabled,
+  onOpenDocument,
+}: Props) {
   if (message.role === "user") {
     return (
       <div className="msg msg-user">
-        <div className="bubble-user">{message.content}</div>
+        <div className="msg-body user-body">
+          {message.attachments?.length ? (
+            <div className="message-attachments">
+              {message.attachments.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  className="message-attachment"
+                  onClick={() => onOpenDocument?.({ id: a.documentId, name: a.name, kind: a.kind })}
+                  title={a.documentId ? `预览 ${a.name}` : `${a.name}（原文件未保存）`}
+                >
+                  <span>{a.kind === "image" ? "🖼" : "📄"}</span>
+                  <span>{a.name}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className="bubble-user">{message.content}</div>
+        </div>
       </div>
     );
   }
@@ -46,7 +72,9 @@ export function MessageItem({ message, streaming = false, onRegenerate, regenera
 
         {message.error ? <div className="error-box">{message.error}</div> : null}
 
-        {!streaming && message.sources?.length ? <SourceList sources={message.sources} /> : null}
+        {!streaming && message.sources?.length ? (
+          <SourceList sources={message.sources} onOpenDocument={onOpenDocument} />
+        ) : null}
 
         {/* 回答写完才出现：既是结束标识，也承载复制 / 重新生成 */}
         {!streaming && (message.content || message.error) ? (

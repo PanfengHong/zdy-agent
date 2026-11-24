@@ -165,14 +165,20 @@ export function loadMessages(id: string): ChatMessage[] {
 /** 写入会话正文，并同步更新索引里的标题（取第一条提问）、条数与更新时间 */
 export function saveMessages(id: string, messages: ChatMessage[]) {
   if (!isBrowser() || messages.length === 0) return;
+  const serialized = JSON.stringify(messages);
+  let unchanged = false;
   try {
-    localStorage.setItem(MSG_PREFIX + id, JSON.stringify(messages));
+    unchanged = localStorage.getItem(MSG_PREFIX + id) === serialized;
+    if (!unchanged) localStorage.setItem(MSG_PREFIX + id, serialized);
   } catch {
     return;
   }
 
   const list = listConversations();
   const idx = list.findIndex((c) => c.id === id);
+  // 内容没变（例如仅选中/切换会话时的回写）就别刷新 updatedAt，否则会话会被排到列表最前
+  if (unchanged && idx >= 0) return;
+
   const firstUser = messages.find((m) => m.role === "user");
   const prev = idx >= 0 ? list[idx] : null;
   // 用户手动改过名字就保留，否则跟随首条提问自动生成

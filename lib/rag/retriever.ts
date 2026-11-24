@@ -31,6 +31,7 @@ export async function retrieve(
     out.push({
       source: {
         id,
+        docId: doc.metadata?.docId ? String(doc.metadata.docId) : undefined,
         source: String(doc.metadata?.source ?? "未知来源"),
         chunk: Number(doc.metadata?.chunk ?? 0),
         score: Number(score.toFixed(4)),

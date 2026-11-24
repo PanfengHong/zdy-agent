@@ -21,6 +21,8 @@ import {
 } from "@/lib/conversations";
 import { isPluginEnabled, usePlugins } from "@/lib/plugins/client";
 
+const SIDEBAR_COLLAPSED_KEY = "zdy:sidebar-collapsed:v1";
+
 interface Health {
   llm: { model: string; configured: boolean };
   embedding: { model: string; configured: boolean };
@@ -38,6 +40,13 @@ const SearchIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
     <circle cx="11" cy="11" r="7" />
     <path d="m20 20-3.8-3.8" strokeLinecap="round" />
+  </svg>
+);
+
+const SidebarToggleIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+    <rect x="3" y="4" width="18" height="16" rx="3" />
+    <path d="M9 4v16" />
   </svg>
 );
 
@@ -132,6 +141,7 @@ export function Sidebar() {
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [activeId, setActive] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   /** 当前展开「更多」菜单的会话 id、面板类型与弹层锚点（固定定位，避开列表滚动裁切） */
   const [menu, setMenu] = useState<{ id: string; x: number; y: number; up: boolean; panel: "main" | "group" } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -172,6 +182,27 @@ export function Sidebar() {
     sync();
     return subscribe(sync);
   }, []);
+
+  // 收起状态在挂载后读取（服务端渲染拿不到 localStorage）
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+    } catch {
+      /* 存储不可用时保持默认展开 */
+    }
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? "1" : "0");
+      } catch {
+        /* 忽略存储失败 */
+      }
+      return next;
+    });
+  };
 
   // Ctrl / Cmd + K 唤起全局搜索
   useEffect(() => {
@@ -385,79 +416,116 @@ export function Sidebar() {
     ) : null;
 
   return (
-    <aside className="sidebar">
-      <Link href="/" className="brand" title="回到对话" aria-label="回到对话页">
-        <div className="brand-mark">Z</div>
-        <div>
-          <div className="brand-name">ZDY Agent</div>
-          <div className="brand-sub">LangChain · RAG</div>
-        </div>
-      </Link>
-
-      <div className="sidebar-top">
-        <button type="button" className="new-chat-btn" onClick={startNewChat}>
-          <PlusIcon />
-          新建对话
-        </button>
-        <button
-          type="button"
-          className="search-btn"
-          onClick={() => setSearchOpen(true)}
-          title="搜索（Ctrl + K）"
-          aria-label="搜索对话与文档"
-        >
-          <SearchIcon />
-        </button>
-      </div>
-
-      <nav className="nav">
-        <div className="nav-label">工作区</div>
-        <Link href="/knowledge" className={pathname.startsWith("/knowledge") ? "active" : ""}>
-          <BookIcon />
-          知识库管理
-        </Link>
-        <Link href="/plugins" className={pathname.startsWith("/plugins") ? "active" : ""}>
-          <PlugIcon />
-          插件
-          {enabledCount > 0 ? <span className="nav-badge">{enabledCount}</span> : null}
-        </Link>
-      </nav>
-
-      <div className="recent">
-        <div className="recent-head">
-          <span>最近对话</span>
-          {conversations.length > 0 ? <span className="recent-count">{conversations.length}</span> : null}
-          {activeAway ? (
-            <button
-              type="button"
-              className="locate-btn"
-              onClick={locateActive}
-              title="定位到当前对话"
-              aria-label="定位到当前对话"
-            >
-              <LocateIcon />
-              定位
-            </button>
+    <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
+      <div className="brand-row">
+        <Link href="/" className="brand" title="回到对话" aria-label="回到对话页">
+          <div className="brand-mark">Z</div>
+          {!collapsed ? (
+            <div>
+              <div className="brand-name">ZDY Agent</div>
+              <div className="brand-sub">LangChain · RAG</div>
+            </div>
           ) : null}
-        </div>
-        <div className="recent-list" ref={listRef}>
-          {conversations.length === 0 ? (
-            <div className="recent-empty">还没有历史对话，提问后会自动保存</div>
-          ) : (
-            <>
-              {renderSection("置顶", pinnedList)}
-              {groupNames.map((g) => renderSection(g, byGroup.get(g)!))}
-              {ungrouped.length > 0 ? (
-                hasSections ? renderSection("对话", ungrouped) : ungrouped.map(renderConv)
-              ) : null}
-            </>
-          )}
+        </Link>
+        <div className="brand-actions">
+          <button
+            type="button"
+            className="search-btn"
+            onClick={() => setSearchOpen(true)}
+            title="搜索（Ctrl + K）"
+            aria-label="搜索对话与文档"
+          >
+            <SearchIcon />
+          </button>
+          <button
+            type="button"
+            className="collapse-btn"
+            onClick={toggleCollapsed}
+            title={collapsed ? "展开侧边栏" : "收起侧边栏"}
+            aria-label={collapsed ? "展开侧边栏" : "收起侧边栏"}
+            aria-expanded={!collapsed}
+          >
+            <SidebarToggleIcon />
+          </button>
         </div>
       </div>
 
-      <div className="sidebar-bottom">
-        <UserMenu health={health} />
-      </div>
+      {!collapsed ? (
+        <>
+          <div className="sidebar-top">
+            <button type="button" className="new-chat-btn" onClick={startNewChat}>
+              <PlusIcon />
+              新建对话
+            </button>
+          </div>
+
+          <nav className="nav">
+            <div className="nav-label">工作区</div>
+            <Link href="/plugins" className={pathname.startsWith("/plugins") ? "active" : ""}>
+              <PlugIcon />
+              插件
+              {enabledCount > 0 ? <span className="nav-badge">{enabledCount}</span> : null}
+            </Link>
+          </nav>
+
+          <div className="recent">
+            <div className="recent-head">
+              <span>最近对话</span>
+              {conversations.length > 0 ? <span className="recent-count">{conversations.length}</span> : null}
+              {activeAway ? (
+                <button
+                  type="button"
+                  className="locate-btn"
+                  onClick={locateActive}
+                  title="定位到当前对话"
+                  aria-label="定位到当前对话"
+                >
+                  <LocateIcon />
+                  定位
+                </button>
+              ) : null}
+            </div>
+            <div className="recent-list" ref={listRef}>
+              {conversations.length === 0 ? (
+                <div className="recent-empty">还没有历史对话，提问后会自动保存</div>
+              ) : (
+                <>
+                  {renderSection("置顶", pinnedList)}
+                  {groupNames.map((g) => renderSection(g, byGroup.get(g)!))}
+                  {ungrouped.length > 0 ? (
+                    hasSections ? renderSection("对话", ungrouped) : ungrouped.map(renderConv)
+                  ) : null}
+                </>
+              )}
+            </div>
+          </div>
+
+          <div className="sidebar-bottom">
+            <UserMenu health={health} />
+          </div>
+        </>
+      ) : (
+        <div className="rail-actions">
+          <button
+            type="button"
+            className="rail-btn"
+            onClick={startNewChat}
+            title="新建对话"
+            aria-label="新建对话"
+          >
+            <PlusIcon />
+          </button>
+          <button
+            type="button"
+            className={`rail-btn${pathname.startsWith("/plugins") ? " active" : ""}`}
+            onClick={() => router.push("/plugins")}
+            title="插件"
+            aria-label="插件"
+          >
+            <PlugIcon />
+          </button>
+        </div>
+      )}
 
       {searchOpen ? <SearchModal onClose={() => setSearchOpen(false)} /> : null}
 

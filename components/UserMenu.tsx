@@ -60,14 +60,23 @@ export function UserMenu({ health }: { health: Health | null }) {
   const [dialog, setDialog] = useState<"settings" | "login" | "logout" | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [profileReady, setProfileReady] = useState(false);
 
   const rootRef = useRef<HTMLDivElement | null>(null);
   const nameInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setProfile(getProfile());
+    const current = getProfile();
+    setProfile(current);
+    document.documentElement.dataset.theme = current.theme;
+    setProfileReady(true);
     return subscribeProfile(() => setProfile(getProfile()));
   }, []);
+
+  useEffect(() => {
+    if (!profileReady) return;
+    document.documentElement.dataset.theme = profile.theme;
+  }, [profile.theme, profileReady]);
 
   // 点击外部 / 按 Esc 收起菜单
   useEffect(() => {
@@ -142,19 +151,6 @@ export function UserMenu({ health }: { health: Health | null }) {
             </div>
           </div>
 
-          <div className="user-menu-status">
-            <div className="um-status-row">
-              <span className={llmReady ? "dot" : "dot warn"} />
-              <span className="um-status-text">{health ? health.llm.model : "正在检测模型…"}</span>
-            </div>
-            <div className="um-status-row">
-              <span className={health ? "dot" : "dot warn"} />
-              <span className="um-status-text">
-                {health ? `知识库 ${health.knowledgeBase.documents} 篇 / ${health.knowledgeBase.chunks} 片段` : "知识库…"}
-              </span>
-            </div>
-            {health && !llmReady ? <div className="um-warn">未配置密钥，请填写 .env.local</div> : null}
-          </div>
 
           <div className="user-menu-divider" />
 
@@ -260,6 +256,29 @@ export function UserMenu({ health }: { health: Health | null }) {
                   <span>邮箱</span>
                   <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" maxLength={64} />
                 </label>
+                {dialog === "settings" ? (
+                  <div className="field">
+                    <span>主题</span>
+                    <div className="theme-switch" role="group" aria-label="主题">
+                      <button
+                        type="button"
+                        className={profile.theme === "light" ? "active" : ""}
+                        aria-pressed={profile.theme === "light"}
+                        onClick={() => saveProfile({ theme: "light" })}
+                      >
+                        浅色
+                      </button>
+                      <button
+                        type="button"
+                        className={profile.theme === "dark" ? "active" : ""}
+                        aria-pressed={profile.theme === "dark"}
+                        onClick={() => saveProfile({ theme: "dark" })}
+                      >
+                        深色
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="modal-meta">
                   当前模型：{health?.llm.model ?? "检测中"} · 向量模型：{health?.embedding.model ?? "检测中"}
                 </div>

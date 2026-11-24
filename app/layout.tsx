@@ -9,8 +9,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var p=JSON.parse(localStorage.getItem('zdy:profile:v1')||'{}');document.documentElement.dataset.theme=p.theme==='dark'?'dark':'light'}catch(e){document.documentElement.dataset.theme='light'}`,
+          }}
+        />
         <div className="app">
           <Sidebar />
           <main className="main">{children}</main>
